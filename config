@@ -1,1 +1,3 @@
 DISKS="sda nvme0n1p4"
+DEVICE="/dev/mmcblk0"
+DEVICE_PART1="/dev/mmcblk0p1"

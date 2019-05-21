@@ -1,0 +1,67 @@
+#!/usr/bin/bash
+
+# shellcheck source=./config
+source "$(dirname "$(realpath "$0")")"/config
+
+TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"
+TOKEN="$TOKEN_MANAGEMENT/.token"
+
+function usage() {
+    echo << "$0 command parameters
+
+Commands:
+
+create [-f] [-w] <profile>
+  Create a new token.
+  The disk keys are retrieved from the currently 
+  loaded token or new keys are created.
+
+  -f   Format the token (new partition table
+       and filesystem).
+
+  -w   Wipe the device before writing the token.
+
+disable <token>
+  Disable a token.
+
+delete <token>
+  Delete a token.
+
+delete-old
+  Delete all disabled tokens.
+
+list [-a]
+  List active tokens.
+
+  -a   List all tokens.
+
+load
+  Load the token (decrypt disks and activate
+  custom configuration).
+
+getkey <disk>
+  Print the key for the disk to the standard
+  output. The key is retrieved from the currently
+  loaded token.
+"
+}
+
+# draft
+# -----
+# we keep only the private key in tokens/<uuid>
+# everything else is deleted as soon as possible
+# temporary files should be created in /tmp
+# and "wiped" before deleting.
+#
+# tokens/ always 000 unless needed
+#
+# when disabled: content replaced
+# with date
+
+function lock() {
+    chmod 000 "$TOKEN_MANAGEMENT"/tokens
+}
+
+function unlock() {
+    chmod 700 "$TOKEN_MANAGEMENT"/tokens
+}

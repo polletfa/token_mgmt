@@ -39,7 +39,7 @@ echo -e "\033[32mExtract token\033[0m"
 tar zxvf <(dd if=/dev/mmcblk0 of=/dev/stdout skip=512) || die
 
 echo -e "\033[32mDecrypt key\033[0m"
-openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/token.keys/$(cat ID).private.pem" -in key.enc -out key || die
+openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/token.keys/$(cat ID).pem" -in key.enc -out key || die
 
 echo -e "\033[32mDecrypt disk keys\033[0m"
 for i in $DISKS; do

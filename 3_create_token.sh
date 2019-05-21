@@ -30,9 +30,9 @@ if [ ! -d token.keys ]; then
     mkdir token.keys
 fi
 echo -e "\033[32mGenerate private key...\033[0m"
-openssl genrsa -out token.keys/"$UUID".private.pem 4096 || die
+openssl genrsa -out token.keys/"$UUID".pem 4096 || die
 echo -e "\033[32mGenerate public key...\033[0m"
-openssl rsa -pubout -in token.keys/"$UUID".private.pem -out token.keys/"$UUID".public.pem || die
+openssl rsa -pubout -in token.keys/"$UUID".pem -out token.keys/"$UUID".public.pem || die
 
 # Generate an encryption key
 echo -e "\033[32mGenerate encryption key...\033[0m"
@@ -54,6 +54,16 @@ if [ -f profiles/"$1".tar ]; then
     echo -e "\033[32mEncrypt profile...\033[0m"
     openssl enc -aes-256-cbc -iter 10 -in profiles/"$1".tar -out tokens/"$UUID"/profile.tar.enc -pass file:./token.keys/"$UUID".key || die
 fi
+
+# Create the token
+echo -e "\033[32mCreate token...\033[0m"
+tar zchf tokens/"$UUID".tar.gz -C tokens/"$UUID" .
+
+
+# Clean
+rm token.keys/"$UUID".key
+rm token.keys/"$UUID".public.pem
+rm -fr tokens/"$UUID"
 
 echo -e "\033[32mToken $UUID created."
 
