@@ -36,7 +36,7 @@ mount -t tmpfs tmpfs "$TOKEN" || die
 cd "$TOKEN" || die
 
 echo -e "\033[32mExtract token\033[0m"
-tar xvf /dev/mmcblk0 || die
+tar zxvf <(dd if=/dev/mmcblk0 of=/dev/stdout skip=512) || die
 
 echo -e "\033[32mDecrypt key\033[0m"
 openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/token.keys/$(cat ID).private.pem" -in key.enc -out key || die
