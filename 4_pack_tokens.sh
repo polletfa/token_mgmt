@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for i in tokens/*; do
+for i in "$(dirname "$(realpath "$0")")"/tokens/*; do
     if [ -d "$i" ]; then
         echo "$i"
         if [ -f "$i".tar ]; then

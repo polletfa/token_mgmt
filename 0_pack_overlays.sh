@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for i in overlays/*; do
+for i in "$(dirname "$(realpath "$0")")"/overlays/*; do
     if [ -d "$i" ]; then
         echo "$i"
         if [ -f "$i".tar ]; then

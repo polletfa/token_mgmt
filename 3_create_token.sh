@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+cd "$(dirname "$(realpath "$0")")" || exit 1
+
 UUID="$(uuidgen)"
 
 if [ "$1" == "" ]; then
@@ -50,7 +52,7 @@ done
 # Encrypt the profile
 if [ -f profiles/"$1".tar ]; then
     echo -e "\033[32mEncrypt profile...\033[0m"
-    openssl enc -aes-256-cbc -iter 10 -in "$i" -out tokens/"$UUID"/profile.tar.enc -pass file:./token.keys/"$UUID".key || die
+    openssl enc -aes-256-cbc -iter 10 -in profiles/"$1".tar -out tokens/"$UUID"/profile.tar.enc -pass file:./token.keys/"$UUID".key || die
 fi
 
 echo -e "\033[32mToken $UUID created."
