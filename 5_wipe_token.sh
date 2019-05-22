@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
-sudo dd if=/dev/urandom of=/dev/mmcblk0 bs=1024 status=progress
+# shellcheck source=./config
+source "$(dirname "$(realpath "$0")")"/config
+
+sudo dd if=/dev/urandom of="$DEVICE" bs=1024 status=progress

@@ -8,7 +8,11 @@ if [ ! -f "$(dirname "$(realpath "$0")")"/tokens/"$1".tar.gz ]; then
     exit 1
 fi
 
-echo -en "o\nn\np\n\n\n\nt\nb\nw\n" | sudo fdisk /dev/mmcblk0
-sudo dd if="$(dirname "$(realpath "$0")")"/tokens/"$1".tar.gz of=/dev/mmcblk0 seek=512
-mkfs.vfat /dev/mmcblk0p1
+# shellcheck source=./config
+source "$(dirname "$(realpath "$0")")"/config
+
+#echo -en "o\nn\np\n\n\n\nt\nb\nw\n" | sudo fdisk "$DEVICE"
+#mkfs.vfat "$DEVICE_PART1"
+
+sudo dd if="$(dirname "$(realpath "$0")")"/tokens/"$1".tar.gz of="$DEVICE" seek=512
 
