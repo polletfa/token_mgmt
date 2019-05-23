@@ -118,7 +118,7 @@ while [ "$1" != "" ]; do
                 exit 1
             fi
             {
-                echo -e "\033[4mUUID|DESCRIPTION|CREATED|STATUS\033[0m"
+                echo -e "\033[4mUUID|PROFILE|DESCRIPTION|CREATED|STATUS\033[0m"
                 for i in "$TOKEN_MANAGEMENT/keys"/$match; do
                     if [ -f "$i" ]; then
                         uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
