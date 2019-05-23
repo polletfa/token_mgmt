@@ -33,9 +33,13 @@ function die() {
     fi
     echo -e "\033[41;38m\033[2JUnauthorized access!" > /etc/issue
 
-    echo "----- $(date)
-$(journalctl -u token_mgmt --boot)" >> "$TOKEN_MANAGEMENT"/unauthorized-access.log
-
+    LOG="$(journalctl -u token_mgmt --boot)"
+    
+    echo "$LOG" >> "$TOKEN_MANAGEMENT"/unauthorized-access.log
+    if [ "$MAILTO" != "" ]; then
+	echo "$LOG" | mail -s "[token_mgmt] Unauthorized access!" "$MAILTO"
+    fi
+    
     wipe
     unmount
     exit 1
