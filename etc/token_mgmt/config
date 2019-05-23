@@ -5,3 +5,9 @@ DEVICE_PART1="/dev/mmcblk0p1"
 
 #DEVICE="/dev/sdb"
 #DEVICE_PART1="/dev/sdb1"
+
+MAILTO="fabien"
+
+COLUMNS="240"
+LINES="67"
+
