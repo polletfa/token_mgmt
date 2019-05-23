@@ -11,8 +11,8 @@ fi
 # shellcheck source=./config
 source "$(dirname "$(realpath "$0")")"/config
 
-#echo -en "o\nn\np\n\n\n\nt\nb\nw\n" | sudo fdisk "$DEVICE"
-#mkfs.vfat "$DEVICE_PART1"
+echo -en "o\nn\np\n\n\n\nt\nb\nw\n" | sudo fdisk "$DEVICE"
+mkfs.vfat "$DEVICE_PART1"
 
 sudo dd if="$(dirname "$(realpath "$0")")"/tokens/"$1".tar.gz of="$DEVICE" seek=512
 

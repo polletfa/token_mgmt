@@ -1,7 +1,7 @@
 DISKS="sda nvme0n1p4"
 
-#DEVICE="/dev/mmcblk0"
-#DEVICE_PART1="/dev/mmcblk0p1"
+DEVICE="/dev/mmcblk0"
+DEVICE_PART1="/dev/mmcblk0p1"
 
-DEVICE="/dev/sdc"
-DEVICE_PART1="/dev/sdc1"
+#DEVICE="/dev/sdb"
+#DEVICE_PART1="/dev/sdb1"
