@@ -9,24 +9,41 @@ TOKEN="$TOKEN_MANAGEMENT/.token"
 function wipe() {
     if [ -d "$TOKEN" ]; then
         for i in "$TOKEN"/*.enc; do
-            cp "$i" "$(basename "$i" .enc)"
-            rm "$(basename "$i" .enc)"
+	    if [ "$(basename "$i" .enc)" != "*" ]; then
+                cp "$i" "$(basename "$i" .enc)"
+                rm "$(basename "$i" .enc)"
+            fi
         done
     fi
 }
 
 function unmount() {
     cd /
-    umount $(mount|grep "$TOKEN"|cut -f3 -d\  )
-    rmdir "$TOKEN"
+    umount $(mount|grep "$TOKEN"|cut -f3 -d\  ) 2>/dev/null
+    rmdir "$TOKEN" 2> /dev/null
 }
 
 function die() {
     echo -e "\033[31mFailed!\033[0m" >&2
+
+    if [ -f /etc/issue ]; then
+	cp /etc/issue /etc/issue.token_mgmt.save
+    else
+	echo > /etc/issue.token_mgmt.save
+    fi
+    echo -e "\033[41;38m\033[2JUnauthorized access!" > /etc/issue
+
+    echo "----- $(date)
+$(journalctl -u token_mgmt --boot)" >> "$TOKEN_MANAGEMENT"/unauthorized-access.log
+
     wipe
     unmount
     exit 1
 }
+
+if [ -f /etc/issue.token_mgmt.save ]; then
+    mv /etc/issue.token_mgmt.save /etc/issue
+fi
 
 echo -e "\033[32mCreate RAM disk\033[0m"
 wipe
@@ -37,13 +54,19 @@ cd "$TOKEN" || die
 
 echo -e "\033[32mExtract token\033[0m"
 tar zxvf <(dd if="$DEVICE" of=/dev/stdout skip=512) || die
+echo "ID: $(cat "ID")"
+echo "PROFILE: $(cat "PROFILE")"
 
 echo -e "\033[32mDecrypt key\033[0m"
 openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/token.keys/$(cat ID).pem" -in key.enc -out key || die
 
 echo -e "\033[32mDecrypt disk keys\033[0m"
 for i in $DISKS; do
-    openssl enc -d -aes-256-cbc -iter 10 -in "$i".enc -out "$i" -pass file:./key || die
+    if [ -f "$i.enc" ]; then
+	openssl enc -d -aes-256-cbc -iter 10 -in "$i".enc -out "$i" -pass file:./key || die
+    else
+	echo "Warning: no key for $i"
+    fi
 done
 
 echo -e "\033[32mDecrypt profile\033[0m"
@@ -66,6 +89,13 @@ find overlays -name "*.tar" -print | while read -r i; do
     mount -t overlay overlay -o lowerdir="$lowr",upperdir="$TOKEN/$dirn/$basn",workdir="$TOKEN/$dirn/$basn-work" "$lowr" || die
 done
 
-## todo: decrypt disks
+echo -e "\033[32mDecrypt disks\033[0m"
+for i in $DISKS; do
+    echo "$i"
+    cryptsetup open /dev/"$i" "$i"-encrypted --key-file "$TOKEN/$i"
+done
+
+#todo: put in a script on the token
+systemctl daemon-reload
 
 wipe
