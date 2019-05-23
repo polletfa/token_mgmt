@@ -1,17 +1,22 @@
 #!/usr/bin/bash
 
 # shellcheck source=./config
-source "$(dirname "$(realpath "$0")")"/config
+source "$(dirname "$(realpath "$0")")"/../etc/token_mgmt/config
 
-TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"
+TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"/../etc/token_mgmt/
 TOKEN="$TOKEN_MANAGEMENT/.token"
 PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*.tar; do echo -n "$(basename "$i" .tar) "; done )none"
+
+umask 0277
+
 function lock() {
     chmod 500 "$TOKEN_MANAGEMENT"/keys
+    chmod 400 "$TOKEN_MANAGEMENT"/keys/*
 }
 
 function unlock() {
     chmod 700 "$TOKEN_MANAGEMENT"/keys
+    chmod 600 "$TOKEN_MANAGEMENT"/keys/*
 }
 
 function usage() {
@@ -119,7 +124,7 @@ while [ "$1" != "" ]; do
                     echo "You cannot disable the last active token. Create another first." >&2
                     exit 1
                 else
-                    echo "$(head -n1 "$TOKEN_MANAGEMENT/keys/$uuid.pem")disabled: $(date)" > "$TOKEN_MANAGEMENT/keys/$uuid.pem-disabled" && rm "$TOKEN_MANAGEMENT/keys/$uuid.pem"
+                    unlock && echo "$(head -n1 "$TOKEN_MANAGEMENT/keys/$uuid.pem")disabled: $(date)" > "$TOKEN_MANAGEMENT/keys/$uuid.pem-disabled" && rm -f "$TOKEN_MANAGEMENT/keys/$uuid.pem" && lock
                 fi
             fi
         ;;
