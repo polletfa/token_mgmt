@@ -29,19 +29,9 @@ create [-p] [-w] <profile>
   -w   Wipe the device before writing the token.
 
 disable [-f] <token>
-  Disable a token.
+  Disable a token. This cannot be undone.
 
   -f   Do not request confirmation.
-
-delete [-f] <token>
-  Delete a token.
-
-  -f   Do not request confirmation before deleting an
-       active token. Disabled tokens can be deleted
-       without confirmation.
-
-delete-old
-  Delete all disabled tokens.
 
 list [-a]
   List active tokens.
@@ -78,28 +68,43 @@ while [ "$1" != "" ]; do
         # disable
         #############################################################
         disable)
-        ;;
-
-        #############################################################
-        # delete
-        #############################################################
-        delete)
-        ;;
-
-        #############################################################
-        # delete-old
-        #############################################################
-        delete-old)
-            function delete-old_usage() {
-                echo "Usage: $0 $command">&2
+            function disable_usage() {
+                echo "Usage: $0 $command [-f] <token>" >&2
             }
-            
-            if [ "$1" != "" ]; then
-                delete-old_usage
+
+            force=
+            if [ "$1" = "-f" ]; then
+                force=y; shift
+            fi
+            uuid="$(basename "$1" .pem)"; shift
+
+            if [ "$uuid" = "" -o "$1" != "" ]; then
+                disable_usage
                 exit 1
             fi
-            rm -f "$TOKEN_MANAGEMENT/keys"/*.pem-disabled
-            ;;
+            
+            if [ ! -f "$TOKEN_MANAGEMENT/keys/$uuid.pem" ]; then
+                echo "Token not found." >&2
+                exit 1
+            fi
+
+            if [ "$force" = "" ]; then
+                echo "Disabing a token will render it useless and cannot be undone." >&2
+                echo "If you are sure, please confirm with:">&2
+                echo >&2
+                echo "    $0 $command -f $uuid">&2
+                echo >&2
+                exit 1
+            else
+                count="$("$0" list | tail -n-1 | grep -v "$uuid" | wc -l)"
+                if [ "$count" = "0" ]; then
+                    echo "You cannot disable the last active token. Create another first." >&2
+                    exit 1
+                else
+                    echo "$(head -n1 "$TOKEN_MANAGEMENT/keys/$uuid.pem")disabled: $(date)" > "$TOKEN_MANAGEMENT/keys/$uuid.pem-disabled" && rm "$TOKEN_MANAGEMENT/keys/$uuid.pem"
+                fi
+            fi
+        ;;
 
         #############################################################
         # list
@@ -118,13 +123,14 @@ while [ "$1" != "" ]; do
                 exit 1
             fi
             {
+                loadeduuid="$(cat "$TOKEN"/ID)"
                 echo -e "\033[4mUUID|PROFILE|DESCRIPTION|CREATED|STATUS\033[0m"
                 for i in "$TOKEN_MANAGEMENT/keys"/$match; do
                     if [ -f "$i" ]; then
                         uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
                         st="\033[0m"
                         status=
-                        if [ "$(cat "$TOKEN"/ID)" == "$uuid" ]; then
+                        if [ "$loadeduuid" == "$uuid" ]; then
                             st="\033[3m"
                             status="loaded"
                         fi
@@ -146,9 +152,7 @@ while [ "$1" != "" ]; do
         #############################################################
         getkey)
             function getkey_usage() {
-                echo "Usage: $0 $command <disk>" >&2
-                echo >&2
-                echo "<disk>: $DISKS" >&2
+                echo "Usage: $0 $command ${DISKS// /|}" >&2
             }
             
             disk="$1"; shift
