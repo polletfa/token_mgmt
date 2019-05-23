@@ -6,26 +6,39 @@ source "$(dirname "$(realpath "$0")")"/config
 TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"
 TOKEN="$TOKEN_MANAGEMENT/.token"
 
+function lock() {
+    chmod 500 "$TOKEN_MANAGEMENT"/keys
+}
+
+function unlock() {
+    chmod 700 "$TOKEN_MANAGEMENT"/keys
+}
+
 function usage() {
-    echo << "$0 command parameters
+    echo "$0 command parameters
 
 Commands:
 
-create [-f] [-w] <profile>
+create [-p] [-w] <profile>
   Create a new token.
   The disk keys are retrieved from the currently 
   loaded token or new keys are created.
 
-  -f   Format the token (new partition table
-       and filesystem).
+  -p   Create partition.
 
   -w   Wipe the device before writing the token.
 
-disable <token>
+disable [-f] <token>
   Disable a token.
 
-delete <token>
+  -f   Do not request confirmation.
+
+delete [-f] <token>
   Delete a token.
+
+  -f   Do not request confirmation before deleting an
+       active token. Disabled tokens can be deleted
+       without confirmation.
 
 delete-old
   Delete all disabled tokens.
@@ -43,25 +56,124 @@ getkey <disk>
   Print the key for the disk to the standard
   output. The key is retrieved from the currently
   loaded token.
-"
+" 
 }
 
-# draft
-# -----
-# we keep only the private key in tokens/<uuid>
-# everything else is deleted as soon as possible
-# temporary files should be created in /tmp
-# and "wiped" before deleting.
-#
-# tokens/ always 000 unless needed
-#
-# when disabled: content replaced
-# with date
+if [ "$1" == "" ]; then
+    usage
+    exit 1
+fi
 
-function lock() {
-    chmod 000 "$TOKEN_MANAGEMENT"/tokens
-}
+while [ "$1" != "" ]; do
+    command="$1"; shift
+    case "$command" in
 
-function unlock() {
-    chmod 700 "$TOKEN_MANAGEMENT"/tokens
-}
+        #############################################################
+        # create
+        #############################################################
+        create)
+        ;;
+
+        #############################################################
+        # disable
+        #############################################################
+        disable)
+        ;;
+
+        #############################################################
+        # delete
+        #############################################################
+        delete)
+        ;;
+
+        #############################################################
+        # delete-old
+        #############################################################
+        delete-old)
+            function delete-old_usage() {
+                echo "Usage: $0 $command">&2
+            }
+            
+            if [ "$1" != "" ]; then
+                delete-old_usage
+                exit 1
+            fi
+            rm -f "$TOKEN_MANAGEMENT/keys"/*.pem-disabled
+            ;;
+
+        #############################################################
+        # list
+        #############################################################
+        list)
+            function list_usage() {
+                echo "Usage: $0 $command">&2
+            }
+            
+            if [ "$1" = "-a" ]; then
+                match="*.pem*"; shift
+            elif [ "$1" = "" ]; then
+                match="*.pem"
+            else
+                list_usage
+                exit 1
+            fi
+            {
+                echo -e "\033[4mUUID|DESCRIPTION|CREATED|STATUS\033[0m"
+                for i in "$TOKEN_MANAGEMENT/keys"/$match; do
+                    if [ -f "$i" ]; then
+                        uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
+                        st="\033[0m"
+                        status=
+                        if [ "$(cat "$TOKEN"/ID)" == "$uuid" ]; then
+                            st="\033[3m"
+                            status="loaded"
+                        fi
+                        
+                        echo -e "$st$uuid|$(head -n 1 "$i")$status\033[0m"
+                    fi
+                done
+            } | column -s '|' -t
+            ;;
+        
+        #############################################################
+        # load
+        #############################################################
+        load)
+        ;;
+
+        #############################################################
+        # getkey
+        #############################################################
+        getkey)
+            function getkey_usage() {
+                echo "Usage: $0 $command <disk>" >&2
+                echo >&2
+                echo "<disk>: $DISKS" >&2
+            }
+            
+            disk="$1"; shift
+            if [ "$disk" = "" ]; then
+                getkey_usage
+                exit 1
+            fi
+            
+            for d in $DISKS; do
+                if [ "$d" = "$disk" ]; then
+                    if [ ! -f "$TOKEN"/key.enc ]; then
+                        echo "No token loaded." >&2
+                        exit 1
+                    fi
+                    openssl enc -d -aes-256-cbc -iter 10 -in "$TOKEN/$disk".enc -out /dev/stdout -pass \
+                            file:<(openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat "$TOKEN"/ID).pem" -in "$TOKEN"/key.enc -out /dev/stdout) \
+                        || exit 1
+                    exit 0
+                fi
+            done
+            getkey_usage
+            exit 1
+            ;;
+        *)
+            echo "Unknown command." >&2
+            exit 1
+    esac
+done
