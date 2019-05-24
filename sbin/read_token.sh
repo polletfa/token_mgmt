@@ -9,8 +9,8 @@ function issue() {
     SIGN="$(cat "$TOKEN_MANAGEMENT"/picture)"
 
     HEIGHT="$(echo "$SIGN" | wc -l)"
-    WIDTH="$(( $(echo "SIGN" | head -n1 | wc -l) - 1 ))"
-    X="$(( COLUMNS / 2 - WIDTH ))"
+    WIDTH="$(( 2 * ( $(echo "$SIGN" | head -n1 | wc -c ) - 1 ) ))"
+    X="$(( ( COLUMNS - WIDTH ) / 2 ))"
     Y="$(( ( LINES - HEIGHT ) / 2 ))"
 
     echo -e -n "\033[2J\033[$Y;${X}H\033[40m"

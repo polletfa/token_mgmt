@@ -8,6 +8,8 @@ DEVICE_PART1="/dev/mmcblk0p1"
 
 MAILTO="fabien"
 
+# TODO: backup keys to remote location
+
 COLUMNS="240"
 LINES="67"
 
