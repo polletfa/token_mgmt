@@ -71,6 +71,16 @@ Commands:
     Print the key for the disk to the standard output. 
     The key is retrieved from the currently loaded token.
 
+  status
+
+    Print the systemd status for the service.
+
+  log [-a]
+
+    Print the systemd log for the service (since boot).
+
+    -a   Print all logs
+
 Configuration:
 
   $TOKEN_MANAGEMENT/config
@@ -394,6 +404,43 @@ while [ "$1" != "" ]; do
             getkey_usage
             exit 1
             ;;
+
+        #############################################################
+        # status
+        #############################################################
+        status)
+            function status_usage() {
+                echo "Usage: $0 $command" >&2
+            }
+
+	    if [ "$1" != "" ]; then
+		status_usage
+		exit 1
+	    fi
+
+	    systemctl status token_mgmt.service
+            ;;
+
+        #############################################################
+        # log
+        #############################################################
+        log)
+            function log_usage() {
+                echo "Usage: $0 $command [-a]" >&2
+            }
+
+	    params="--boot"
+	    if [ "$1" = "-a" ]; then
+		params=; shift
+	    fi
+	    if [ "$1" != "" ]; then
+		log_usage
+		exit 1
+	    fi
+
+	    journalctl -u token_mgmt $params
+            ;;
+
         *)
             echo "Unknown command." >&2
             exit 1
