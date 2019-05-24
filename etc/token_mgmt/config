@@ -1,15 +1,29 @@
+#
+# List of devices that can be used as tokens
+#
+DEVICES="/dev/sdb /dev/sdc /dev/sdd /dev/mmcblk0"
+
+#
+# List of encrypted disks
+#
 DISKS="sda nvme0n1p4"
 
-DEVICE="/dev/mmcblk0"
-DEVICE_PART1="/dev/mmcblk0p1"
-
-#DEVICE="/dev/sdb"
-#DEVICE_PART1="/dev/sdb1"
-
+#
+# User to receive notifications of unauthorized boots.
+#
 MAILTO="fabien"
 
-# TODO: backup keys to remote location
+#
+# Remote directory for rsync backup of the keys
+# <user>@<host>:<path>
+#
+BACKUP="fabien@la86server:token_mgmt.nobackup"
 
+#
+# Dimensions of the login terminal
+# Used to position the "Access Denied" picture in the
+# middle of the screen.
+#
 COLUMNS="240"
 LINES="67"
 

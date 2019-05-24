@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# todo: make install
+
 source "$(dirname "$(realpath "$0")")"/../etc/token_mgmt/config
 
 TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"/../etc/token_mgmt/
@@ -9,30 +11,42 @@ PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*.tar; do echo -n "$(basename 
 umask 0277
 
 function lock() {
-    chmod 500 "$TOKEN_MANAGEMENT"/keys
-    chmod 400 "$TOKEN_MANAGEMENT"/keys/*
+    chmod -R u-w "$TOKEN_MANAGEMENT"/keys
 }
 
 function unlock() {
-    chmod 700 "$TOKEN_MANAGEMENT"/keys
-    chmod 600 "$TOKEN_MANAGEMENT"/keys/*
+    chmod -R u+w "$TOKEN_MANAGEMENT"/keys
 }
 
+function update_backup() {
+    if [ -n "$BACKUP" ]; then
+	echo "Update backup..."
+	rsync -e ssh -avz -H --delete --progress --rsync-path="rsync" "$TOKEN_MANAGEMENT/keys" "$BACKUP"
+    fi
+}
+
+# todo: reduce text and create man page instead
 function usage() {
     echo "$0 command parameters
 
 Commands:
 
-  create [-p] [-w] ${PROFILES// /|}
+  create [-d DEVICE] [-p] [-w] [-f] ${PROFILES// /|}
 
     Create a new token.
 
     If there is no active token in the list, new disk keys are created.
-    Otherwise, the keys from the currently loaded token are used.
+    Otherwise, a valid token must be plugged in to retrieve the keys.
+
+    -d   Device. If not specified, the program tries to find a suitable
+         device.
 
     -p   Create partition.
 
     -w   Wipe the device before writing the token.
+
+    -f   Do not request confirmation (confirmation is requested for -p,
+         -w and if -d is not specified).
 
   disable [-f] <token>
 
@@ -56,6 +70,50 @@ Commands:
 
     Print the key for the disk to the standard output. 
     The key is retrieved from the currently loaded token.
+
+Configuration:
+
+  $TOKEN_MANAGEMENT/config
+
+    General configuration
+
+    DEVICES  List of devices that can be used as tokens
+
+    DISKS    List of encrypted disks
+
+    MAILTO   User to receive notifications of unauthorized boots.
+
+    BACKUP   Remote directory for rsync backup of the keys
+             <user>@<host>:<path>
+
+    COLUMNS  Dimensions of the login terminal
+    LINES    Used to position the \"Access Denied\" picture in the
+             middle of the screen.
+
+  $TOKEN_MANAGEMENT/picture
+
+    Picture displayed on the login console on unauthorized boots.
+    The picture is written in /etc/issue.
+    Each pixel is represented by a number:
+
+      0  Black
+      1  Red
+      2  Green
+      3  Yellow
+      4  Blue
+      5  Magenta
+      6  Cyan
+      7  White
+
+  $TOKEN_MANAGEMENT/profiles/*
+
+    A profile is a custom configuration that is loaded on top
+    of the system configuration when the token is loaded. A token
+    contains a profile made of multiple overlays.
+
+  $TOKEN_MANAGEMENT/overlays/*
+
+    Overlays are configuration units that can be included in profiles.
 
 Getting started:
 
@@ -84,6 +142,7 @@ while [ "$1" != "" ]; do
         # create
         #############################################################
         create)
+	    #todo
         ;;
 
         #############################################################
@@ -118,12 +177,13 @@ while [ "$1" != "" ]; do
                 echo >&2
                 exit 1
             else
-                count="$("$0" list | tail -n-1 | grep -v "$uuid" | wc -l)"
+                count="$("$0" list | tail -n +2 | grep -v "$uuid" | wc -l)"
                 if [ "$count" = "0" ]; then
                     echo "You cannot disable the last active token. Create another first." >&2
                     exit 1
                 else
                     unlock && echo "$(head -n1 "$TOKEN_MANAGEMENT/keys/$uuid.pem")disabled: $(date)" > "$TOKEN_MANAGEMENT/keys/$uuid.pem-disabled" && rm -f "$TOKEN_MANAGEMENT/keys/$uuid.pem" && lock
+		    update_backup
                 fi
             fi
         ;;
@@ -133,14 +193,14 @@ while [ "$1" != "" ]; do
         #############################################################
         list)
             function list_usage() {
-                echo "Usage: $0 $command">&2
+                echo "Usage: $0 $command [-a]">&2
             }
             
+            match="*.pem"
             if [ "$1" = "-a" ]; then
                 match="*.pem*"; shift
-            elif [ "$1" = "" ]; then
-                match="*.pem"
-            else
+	    fi
+	    if [ "$1" != "" ]; then
                 list_usage
                 exit 1
             fi
@@ -167,7 +227,143 @@ while [ "$1" != "" ]; do
         # load
         #############################################################
         load)
-        ;;
+	    function load_usage() {
+		echo "$0 $command [-l]" >&2
+	    }
+
+	    if [ "$1" = "-l" ]; then
+		loadonly=y; shift
+	    fi
+	    if [ "$1" != "" ]; then
+		load_usage
+		exit 1
+	    fi
+
+	    function issue() {
+		SIGN="$(cat "$TOKEN_MANAGEMENT"/picture)"
+
+		HEIGHT="$(echo "$SIGN" | wc -l)"
+		WIDTH="$(( 2 * ( $(echo "$SIGN" | head -n1 | wc -c ) - 1 ) ))"
+		X="$(( ( COLUMNS - WIDTH ) / 2 ))"
+		Y="$(( ( LINES - HEIGHT ) / 2 ))"
+
+		echo -e -n "\033[2J\033[$Y;${X}H\033[40m"
+		
+		prev=
+		for (( i=0; i<${#SIGN}; i++ )); do
+		    if [[ "${SIGN:$i:1}" == $'\n' ]]; then
+			echo
+			echo -e -n "\033[${X}G"
+		    else
+			if [ "${SIGN:$i:1}" != "$prev" ]; then
+			    echo -n -e "\033[4${SIGN:$i:1}m"
+			    prev="${SIGN:$i:1}"
+			fi
+			echo -n "  "
+		    fi
+		done
+		echo -e "\033[H\033[40;37mUnauthorized access!"
+	    }
+
+	    function unmount() {
+		cd / || exit 1
+		umount "$(mount|grep "$TOKEN"|cut -f3 -d\  )" 2>/dev/null
+		rmdir "$TOKEN" 2> /dev/null
+	    }
+
+	    function die() {
+		echo -e "\033[31mFailed!\033[0m" >&2
+
+		if [ -f /etc/issue ]; then
+		    cp /etc/issue /etc/issue.token_mgmt.save
+		else
+		    echo > /etc/issue.token_mgmt.save
+		fi
+		issue > /etc/issue
+		
+		if [ "$MAILTO" != "" ]; then
+		    journalctl -u token_mgmt --boot | mail -s "[token_mgmt] Unauthorized access!" "$MAILTO"
+		fi
+		
+		unmount
+		exit 1
+	    }
+
+	    if [ -f /etc/issue.token_mgmt.save ]; then
+		mv /etc/issue.token_mgmt.save /etc/issue
+	    fi
+
+	    for DEVICE in $DEVICES; do
+		echo -en "\033[33mCheck $DEVICE for token: \033[0m"
+		if [ ! -b "$DEVICE" ]; then
+		    echo -e "\033[31mNo device\033[0m"
+		    continue
+		fi
+		if [ "$(dd if="$DEVICE" of=/dev/stdout skip=512 count=1 status=none | head -c2 )" != $'\x1f\x8b' ]; then
+		    echo -e "\033[31mNo token\033[0m"
+		    continue
+		fi
+		echo -e "\033[32mToken found\033[0m"
+
+		echo -e "\033[33mCreate RAM disk...\033[0m"
+		unmount
+		mkdir -p "$TOKEN" || die
+		mount -t tmpfs tmpfs "$TOKEN" || die
+		cd "$TOKEN" || die
+
+		echo -e "\033[33mExtract token...\033[0m"
+		tar zxvf <(dd if="$DEVICE" of=/dev/stdout skip=512) || die
+		echo "ID: $(cat "ID")"
+		echo "PROFILE: $(cat "PROFILE")"
+
+		function gettokenkey() {
+		    openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" -in key.enc -out /dev/stdout
+		}
+		function getdiskkey() {
+		    openssl enc -d -aes-256-cbc -iter 10 -in "$1".enc -out /dev/stdout -pass file:<(gettokenkey)
+		}
+
+		echo -e "\033[33mUnpack profile\033[0m"
+		tar xvf <(openssl enc -d -aes-256-cbc -iter 10 -in profile.tar.enc -out /dev/stdout -pass file:<(gettokenkey) ) || die
+		find overlays -name "*.tar" -print | while read -r i; do
+		    dirn="$(dirname "$i")"
+		    basn="$(basename "$i" .tar)"
+		    mkdir "$dirn/$basn" || die
+		    tar xvf "$i" -C "$dirn/$basn" || die
+		done
+		
+		if [ "$loadonly" != "y" ]; then
+		    echo -e "\033[33mMount overlays...\033[0m"
+		    find overlays -name "*.tar" -print | while read -r i; do
+			dirn="$(dirname "$i")"
+			basn="$(basename "$i" .tar)"
+			lowr="${dirn#overlays}/$basn"
+			
+			echo "$lowr"
+			mkdir "$dirn/$basn-work" || die
+			mount -t overlay overlay -o lowerdir="$lowr,upperdir=$TOKEN/$dirn/$basn,workdir=$TOKEN/$dirn/$basn-work" "$lowr" || die
+		    done
+		    
+		    echo -e "\033[33mDecrypt disks...\033[0m"
+		    for i in $DISKS; do
+			if [ -f "$i.enc" ]; then
+			    echo "$i"
+			    cryptsetup open /dev/"$i" "$i"-encrypted --key-file <(getdiskkey "$i")
+			else
+			    echo "Warning: no key for $i"
+			fi
+		    done
+		    #todo: put in a script on the token
+		    systemctl daemon-reload
+		fi
+		
+		exit 0
+	    done
+
+	    echo -e "\033[31mNo token found!\033[0m"
+	    wipe
+	    exit 1
+            ;;
 
         #############################################################
         # getkey
