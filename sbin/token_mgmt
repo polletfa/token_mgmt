@@ -1,10 +1,17 @@
 #!/usr/bin/bash
 
-# todo: make install
+case "$(dirname "$(realpath "$0")")" in
+    /bin)              configdir=/etc                   ;;
+    /sbin)             configdir=/etc                   ;;
+    /usr/bin)          configdir=/etc                   ;;
+    /usr/sbin)         configdir=/etc                   ;;
+    /usr/local/bin)    configdir=/usr/local/etc         ;;
+    /usr/local/sbin)   configdir=/usr/local/etc         ;;
+    *) configdir="$(dirname "$(realpath "$0")")"/../etc ;;
+esac
+source "$configdir"/token_mgmt/config
 
-source "$(dirname "$(realpath "$0")")"/../etc/token_mgmt/config
-
-TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"/../etc/token_mgmt/
+TOKEN_MANAGEMENT="$configdir"/token_mgmt/
 TOKEN="$TOKEN_MANAGEMENT/.token"
 PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*; do if [ -d "$i" ]; then echo -n "$(basename "$i" .tar) "; fi; done )"
 PROFILES="${PROFILES:0:-1}"
@@ -382,7 +389,7 @@ while [ "$1" != "" ]; do
                 exit 1
             fi
             {
-                loadeduuid="$(cat "$TOKEN"/ID)"
+                loadeduuid="$(cat "$TOKEN"/ID 2>/dev/null)"
                 echo -e "\033[4mUUID|PROFILE|DESCRIPTION|CREATED|STATUS\033[0m"
                 for i in "$TOKEN_MANAGEMENT/keys"/$match; do
                     if [ -f "$i" ]; then

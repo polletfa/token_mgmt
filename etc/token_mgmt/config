@@ -1,18 +1,18 @@
 #
 # List of encrypted disks
 #
-DISKS="sda nvme0n1p4"
+DISKS="sda1"
 
 #
 # User to receive notifications of unauthorized boots.
 #
-MAILTO="fabien"
+#MAILTO="root"
 
 #
 # Remote directory for rsync backup of the keys
 # <user>@<host>:<path>
 #
-#BACKUP="fabien@la86server:token_mgmt.nobackup"
+#BACKUP="user@host:path"
 
 #
 # Dimensions of the login terminal
