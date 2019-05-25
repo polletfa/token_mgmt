@@ -12,7 +12,7 @@ MAILTO="fabien"
 # Remote directory for rsync backup of the keys
 # <user>@<host>:<path>
 #
-BACKUP="fabien@la86server:token_mgmt.nobackup"
+#BACKUP="fabien@la86server:token_mgmt.nobackup"
 
 #
 # Dimensions of the login terminal

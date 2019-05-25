@@ -26,19 +26,28 @@ function update_backup() {
     fi
 }
 
+function gettokenkey() {
+    openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat "$TOKEN/ID").pem" -in "$TOKEN/key.enc" -out /dev/stdout
+}
+function getdiskkey() {
+    openssl enc -d -aes-256-cbc -iter 10 -in "$TOKEN/$1.enc" -out /dev/stdout -pass file:<(gettokenkey)
+}
+
 # todo: reduce text and create man page instead
 function usage() {
     echo "$0 command parameters
 
 Commands:
 
-  create [-p ${PROFILES// /|}] [-P] [-w] [-f] DEVICE
+  create [-n NAME] [-p ${PROFILES// /|}] [-P] [-w] [-f] DEVICE
 
     Create a new token.
 
-    The disk keys are retrieved from the currently loaded token.
-    If no token is loaded AND no active token exists, new disk
-    keys are randomly generated.
+    If no valid token exists, new disk keys are generated.
+    Otherwise, a valid token needs to be loaded and the keys are
+    extracted from the token.
+
+    -n   Name
 
     -p   Add profile to the token
 
@@ -151,11 +160,15 @@ while [ "$1" != "" ]; do
         #############################################################
         create)
             function create_usage() {
-                echo "create [-p ${PROFILES// /|}] [-P] [-w] [-f] DEVICE"  >&2
+                echo "create [-n NAME] [-p ${PROFILES// /|}] [-P] [-w] [-f] DEVICE"  >&2
             }
 
             while [ "$1" != "" ]; do
                 case "$1" in
+                    "-n")
+                        name="$2"; shift; shift
+                        ;;
+                    
                     "-p")
                         profile="$2"; shift; shift
                         if [ ! -d "$TOKEN_MANAGEMENT/profiles/$profile" ]; then
@@ -185,23 +198,127 @@ while [ "$1" != "" ]; do
                 create_usage
                 exit 1
             fi
-            DEVICE="$1"
+            device="$1"
             
-	    if [ ! -b "$DEVICE" ]; then
-                if [ ! -b "/dev/$DEVICE" ]; then
-		    echo -e "No device." >&2
+	    if [ ! -b "$device" ]; then
+                if [ ! -b "/dev/$device" ]; then
+		    echo "No device." >&2
                     exit 1
                 else
-                    DEVICE="/dev/$DEVICE"
+                    device="/dev/$device"
                 fi
             fi
-	    if ! dd if="$DEVICE" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
+	    if ! dd if="$device" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
 		echo "Device not available." >&2
 		exit 1
-	    fi
+	    fi          
 
-	    #todo
+            if [ "$wipe" = "y" ] || [ "partition" = "y" ]; then
+                if [ "$force" != "y" ]; then
+                    echo "This will erase any data on the device. "
+                    echo "If you are sure, please confirm with:">&2
+                    echo >&2
+                    echo -n "    $0 $command "
+                    if [ -n "$name" ]; then echo -n "-n \"$name\" " >&2; fi
+                    if [ -n "$profile" ]; then echo -n "-p \"$profile\" ">&2; fi
+                    if [ -n "$partition" ] && [ -z "$wipe" ]; then echo -n "-P " >&2; fi
+                    if [ -n "$wipe" ]; then echo -n "-w ">&2; fi
+                    echo "-f $device">&2
+                    echo >&2
+                    exit 1
+                fi
+            fi
             
+            count="$("$0" list | tail -n +2 | wc -l)"
+            if [ "$count" != "0" ]; then
+                for i in $DISKS; do
+                    if ! getdiskkey "$i" 2>/dev/null >/dev/null; then
+                        echo "Disk keys missing. Load a token first."
+                        exit 1
+                    fi
+                done
+            else
+                createkeys=y
+            fi
+
+            TMP="/tmp/token_mgmt.$$"
+
+            function die() {
+                rm -fr "$TMP"
+                echo "Failed!"
+                exit 1
+            }
+            
+            mkdir "$TMP"
+            UUID="$(uuidgen)"
+            echo "$UUID" > "$TMP"/ID
+
+            echo "Create token private key..."
+            PRIVATE_KEY="$(openssl genrsa -out /dev/stdout 4096 )" || die
+
+            echo "Create token encryption key..."
+            KEY="$(openssl rand -base64 256 )"
+            openssl rsautl -encrypt \
+                    -inkey <(openssl rsa -pubout -in <(echo -n "$PRIVATE_KEY") -out /dev/stdout || die ) \
+                    -pubin -in <(echo -n "$KEY") -out "$TMP/key.enc" || die
+
+            for i in $DISKS; do
+                if [ "$createkeys" == "y" ]; then
+                    echo "Create key for disk $i..."
+                    DISKKEY="$(dd if=/dev/urandom of=/dev/stdout bs=4096 count=1 iflag=fullblock status=none | base64 )" || die
+                else
+                    echo "Get key for disk $i..."
+                    DISKKEY="$(getdiskkey "$i" | base64)" || die
+                fi
+                echo "Encrypt the key for disk $i..."
+                openssl enc -aes-256-cbc -iter 10 -in <(echo -n "$DISKKEY" | base64 -d) -out "$TMP/$i.enc" \
+                        -pass file:<(echo -n "$KEY" ) || die
+            done
+                        
+            if [ "$profile" != "" ]; then
+                while read -r overlay; do
+                    overlay="$(readlink "$overlay")"
+                    echo "Pack overlay $(basename "$overlay" .tar)..."
+                    tar chf "$TOKEN_MANAGEMENT/overlays/$(basename "$overlay")" -C "$TOKEN_MANAGEMENT/overlays/$(basename "$overlay" .tar)" . || exit 1
+                done < <(find "$TOKEN_MANAGEMENT/profiles/$profile/overlays" -name "*.tar")
+                echo "Pack profile $profile..."
+                tar chf "$TOKEN_MANAGEMENT/profiles/$profile.tar" -C "$TOKEN_MANAGEMENT/profiles/$profile" . || exit 1
+            fi
+
+            echo "Encrypt profile..."
+            openssl enc -aes-256-cbc -iter 10 -in "$TOKEN_MANAGEMENT/profiles/$profile.tar" -out "$TMP/profile.enc" \
+                    -pass file:<(echo -n "$KEY") || die
+
+            echo "Prepare token..."
+            tar zchf "$TMP/$UUID".tar.gz -C "$TMP" --exclude="*.tar.gz" . || die
+
+            if [ -n "$wipe" ]; then
+                echo "Wipe device..."
+                dd if=/dev/urandom of="$device" bs=1024 status=progress || die
+            fi
+
+            if [ -n "$partition" ]; then
+                echo "Create new partition table..."
+                echo ";,7" | sudo sfdisk  /dev/mmcblk0 || die
+                mkfs.ntfs "$(ls "$device"?* | sort | head -n1)" || die
+            fi
+            
+            echo -e "Write token..."
+            dd if="$TMP/$UUID.tar.gz" of="$device" seek=512 || die
+
+            echo "Save token key..."
+            if [ ! -d "$TOKEN_MANAGEMENT/keys" ]; then
+                mkdir "$TOKEN_MANAGEMENT/keys" 
+            fi
+            unlock || die
+            { 
+                echo "$profile|$name|$(date)|"
+                echo -n "$PRIVATE_KEY"
+            } > "$TOKEN_MANAGEMENT/keys/$UUID.pem" || { lock ; die ; }
+            lock
+
+            update_backup
+                        
             exit 0
             ;;
 
@@ -246,7 +363,7 @@ while [ "$1" != "" ]; do
 		    update_backup
                 fi
             fi
-        ;;
+            ;;
 
         #############################################################
         # list
@@ -332,7 +449,7 @@ while [ "$1" != "" ]; do
 	    }
 
 	    function die() {
-		echo -e "\033[31mFailed!\033[0m" >&2
+		echo "Failed!" >&2
 
 		if [ -f /etc/issue ]; then
 		    cp /etc/issue /etc/issue.token_mgmt.save
@@ -353,51 +470,40 @@ while [ "$1" != "" ]; do
 		mv /etc/issue.token_mgmt.save /etc/issue
 	    fi
 
-	    find /dev -type b -print | while read -r DEVICE; do
-		echo -en "\033[33mCheck $DEVICE for token: \033[0m"
-		if [ ! -b "$DEVICE" ]; then
-		    echo -e "\033[31mNo device\033[0m"
+	    while read -r device; do
+		echo -n "Check $device for token: "
+		if [ ! -b "$device" ]; then
+		    echo "No device"
 		    continue
 		fi
-		if ! dd if="$DEVICE" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
-		    echo -e "\033[31mDevice not available.\033[0m"
+		if ! dd if="$device" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
+		    echo "Device not available."
 		    continue
 		fi
-		if [ "$(tr -d '\0' < <(dd if="$DEVICE" of=/dev/stdout skip=512 count=1 status=none) | head -c2 )" != $'\x1f\x8b' ]; then
-		    echo -e "\033[31mNo token\033[0m"
+		if [ "$(tr -d '\0' < <(dd if="$device" of=/dev/stdout skip=512 count=1 status=none) | head -c2 )" != $'\x1f\x8b' ]; then
+		    echo "No token"
 		    continue
 		fi
-		echo -e "\033[32mToken found\033[0m"
+		echo "Token found."
 
-		echo -e "\033[33mCreate RAM disk...\033[0m"
+		echo "Create RAM disk..."
 		unmount
 		mkdir -p "$TOKEN" || die
 		mount -t tmpfs tmpfs "$TOKEN" || die
 		cd "$TOKEN" || die
 
-		echo -e "\033[33mExtract token...\033[0m"
-		tar zxvf <(dd if="$DEVICE" of=/dev/stdout skip=512) || die
+		echo "Extract token..."
+		tar zxvf <(dd if="$device" of=/dev/stdout skip=512) || die
 		echo "ID: $(cat "ID")"
-                if [ -f "profile.tar.enc" ]; then
-		    echo "PROFILE: $(cat "PROFILE")"
-                else
-                    echo "No profile."
-                fi
 
                 if [ ! -f "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" ]; then
-                    echo -e "\033[31mNot a valid token.\033[0m">&2
-                    die
+                    echo "Not a valid token.">&2
+                    die            
                 fi
-		function gettokenkey() {
-		    openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" -in key.enc -out /dev/stdout
-		}
-		function getdiskkey() {
-		    openssl enc -d -aes-256-cbc -iter 10 -in "$1".enc -out /dev/stdout -pass file:<(gettokenkey)
-		}
 
-                if [ -f "profile.tar.enc" ]; then 
-		    echo -e "\033[33mUnpack profile\033[0m"
-		    tar xvf <(openssl enc -d -aes-256-cbc -iter 10 -in profile.tar.enc -out /dev/stdout -pass file:<(gettokenkey) ) || die
+                if [ -f "profile.enc" ]; then 
+		    echo "Unpack profile..."
+		    tar xvf <(openssl enc -d -aes-256-cbc -iter 10 -in profile.enc -out /dev/stdout -pass file:<(gettokenkey) ) || die
 		    find overlays -name "*.tar" -print | while read -r i; do
 		        dirn="$(dirname "$i")"
 		        basn="$(basename "$i" .tar)"
@@ -408,7 +514,7 @@ while [ "$1" != "" ]; do
                 
 		if [ "$loadonly" != "y" ]; then
                     if [ -d overlays ]; then
-		        echo -e "\033[33mMount overlays...\033[0m"
+		        echo "Mount overlays..."
 		        find overlays -name "*.tar" -print | while read -r i; do
 			    dirn="$(dirname "$i")"
 			    basn="$(basename "$i" .tar)"
@@ -420,7 +526,7 @@ while [ "$1" != "" ]; do
 		        done
 		    fi
                         
-		    echo -e "\033[33mDecrypt disks...\033[0m"
+		    echo "Decrypt disks..."
 		    for i in $DISKS; do
 			if [ -f "$i.enc" ]; then
 			    echo "$i"
@@ -429,15 +535,16 @@ while [ "$1" != "" ]; do
 			    echo "Warning: no key for $i"
 			fi
 		    done
-                    
-		    #todo: put in a script on the token
-		    systemctl daemon-reload
+
+                    if [ -x "$TOKEN/post-load.sh" ]; then
+                        "$TOKEN/post-load.sh" || die
+                    fi
 		fi
 		
 		exit 0
-	    done
+	    done < <(find /dev -type b -print)
 
-	    echo -e "\033[31mNo token found!\033[0m"
+	    echo "No token found!"
 	    die
             ;;
 
@@ -461,9 +568,7 @@ while [ "$1" != "" ]; do
                         echo "No token loaded." >&2
                         exit 1
                     fi
-                    openssl enc -d -aes-256-cbc -iter 10 -in "$TOKEN/$disk".enc -out /dev/stdout -pass \
-                            file:<(openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat "$TOKEN"/ID).pem" -in "$TOKEN"/key.enc -out /dev/stdout) \
-                        || exit 1
+                    getdiskkey "$disk"
                     exit 0
                 fi
             done
