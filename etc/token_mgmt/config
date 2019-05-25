@@ -1,9 +1,4 @@
 #
-# List of devices that can be used as tokens
-#
-DEVICES="/dev/sdb /dev/sdc /dev/sdd /dev/mmcblk0"
-
-#
 # List of encrypted disks
 #
 DISKS="sda nvme0n1p4"
