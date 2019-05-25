@@ -405,11 +405,20 @@ while [ "$1" != "" ]; do
                  )"
 
             echo -e "\033[4m$(head -n1 <(echo "$TABLE"))\033[0m"
-            CONTENT="$(tail -n+2 <(echo "$TABLE") |sort)"
-            loadedline="$(echo "$CONTENT" | grep -n -e "loaded\$" | cut -d: -f1 |head -n1)"
-            echo "$CONTENT" | head -n$((loadedline-1))
-            echo -e "\033[3m$(echo "$CONTENT" | tail -n+"$loadedline" | head -n1)\033[0m"
-            echo "$CONTENT" | tail -n+$((loadedline+1))
+            while read -r line; do
+                if grep -e "loaded\$" <(echo "$line") >/dev/null; then
+                    echo -e "\033[7m$line\033[0m"
+                elif grep -e "disabled:\\s" <(echo "$line") >/dev/null; then
+                    echo -e "\033[3m$line\033[0m"
+                else
+                    echo "$line"
+                fi
+            done < <(tail -n+2 <(echo "$TABLE") | sort)
+            
+            # loadedline="$(echo "$CONTENT" | grep -n -e "loaded\$" | cut -d: -f1 |head -n1)"
+            # echo "$CONTENT" | head -n$((loadedline-1))
+            # echo -e "\033[3m$(echo "$CONTENT" | tail -n+"$loadedline" | head -n1)\033[0m"
+            # echo "$CONTENT" | tail -n+$((loadedline+1))
             ;;
         
         #############################################################
