@@ -219,8 +219,8 @@ while [ "$1" != "" ]; do
                     echo "If you are sure, please confirm with:">&2
                     echo >&2
                     echo -n "    $0 $command "
-                    if [ -n "$name" ]; then echo -n "-n \"$name\" " >&2; fi
-                    if [ -n "$profile" ]; then echo -n "-p \"$profile\" ">&2; fi
+                    if [ -n "$name" ]; then echo -n "-n '${name//\'/\'\\\'\'}' " >&2; fi
+                    if [ -n "$profile" ]; then echo -n "-p '${profile//\'/\'\\\'\'}' ">&2; fi
                     if [ -n "$partition" ] && [ -z "$wipe" ]; then echo -n "-P " >&2; fi
                     if [ -n "$wipe" ]; then echo -n "-w ">&2; fi
                     echo "-f $device">&2
@@ -294,7 +294,7 @@ while [ "$1" != "" ]; do
 
             if [ -n "$wipe" ]; then
                 echo "Wipe device..."
-                dd if=/dev/urandom of="$device" bs=1024 status=progress || die
+                dd if=/dev/urandom of="$device" bs=1024 status=progress
             fi
 
             if [ -n "$partition" ]; then
