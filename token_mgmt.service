@@ -1,10 +1,13 @@
 #
-# Note: if you have ZFS pools on encrypted devices, you should disable zfs-import-cache
-# and delete the zpool cache (/etc/zfs/zpool.cache. Otherwise, these devices would be
-# removed from the cache after a failed attempt to load a token and would need to
-# be reimported manually on the next boot. Scanning for ZFS pools on each boot solves
-# this issue.
+# Note: if you have ZFS pools on encrypted devices,
+# you should disable zfs-import-cache and delete the
+# zpool cache (/etc/zfs/zpool.cache.
+# Otherwise, these devices would be removed from the cache
+# after a failed attempt to load a token and would need to
+# be reimported manually on the next boot.
+# Scanning for ZFS pools on each boot solves this issue.
 #
+
 [Unit]
 Description=Load token and decrypt disks
 DefaultDependencies=no
@@ -20,10 +23,7 @@ Before=zfs-import-scan.service
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
-ExecStart=/root/token_mgmt/read_token.sh
-
-# Todo: stop
+ExecStart=token_mgmt load
 
 [Install]
 WantedBy=basic.target
