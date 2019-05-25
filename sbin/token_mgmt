@@ -388,23 +388,25 @@ while [ "$1" != "" ]; do
                 list_usage
                 exit 1
             fi
-            {
-                loadeduuid="$(cat "$TOKEN"/ID 2>/dev/null)"
-                echo -e "\033[4mUUID|PROFILE|DESCRIPTION|CREATED|STATUS\033[0m"
-                for i in "$TOKEN_MANAGEMENT/keys"/$match; do
-                    if [ -f "$i" ]; then
-                        uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
-                        st="\033[0m"
-                        status=
-                        if [ "$loadeduuid" == "$uuid" ]; then
-                            st="\033[3m"
-                            status="loaded"
-                        fi
-                        
-                        echo -e "$st$uuid|$(head -n 1 "$i")$status\033[0m"
-                    fi
-                done
-            } | column -s '|' -t
+            TABLE="$({       
+                       loadeduuid="$(cat "$TOKEN"/ID 2>/dev/null)"
+                       for i in "$TOKEN_MANAGEMENT/keys"/$match; do
+                           if [ -f "$i" ]; then
+                               uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
+                               st="\033[0m"
+                               status=
+                               if [ "$loadeduuid" == "$uuid" ]; then
+                                   st="\033[3m"
+                                   status="loaded"
+                               fi
+                               
+                               echo -e "$st|$uuid|$(head -n 1 "$i")|$status\033[0m"
+                           fi
+                       done
+                   } | column -s '|' -t -N $'\033[4m',UUID,PROFILE,NAME,CREATED,STATUS,$'\033[0m' -O 1,NAME
+                 )"
+            head -n1 <(echo "$TABLE")
+            tail -n+2 <(echo "$TABLE") | sort
             ;;
         
         #############################################################
