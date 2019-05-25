@@ -393,20 +393,23 @@ while [ "$1" != "" ]; do
                        for i in "$TOKEN_MANAGEMENT/keys"/$match; do
                            if [ -f "$i" ]; then
                                uuid="$(basename "$(basename "$i" .pem)" .pem-disabled)"
-                               st="\033[0m"
                                status=
                                if [ "$loadeduuid" == "$uuid" ]; then
-                                   st="\033[3m"
                                    status="loaded"
                                fi
                                
-                               echo -e "$st|$uuid|$(head -n 1 "$i")|$status\033[0m"
+                               echo -e "$uuid|$(head -n 1 "$i")$status"
                            fi
                        done
-                   } | column -s '|' -t -N $'\033[4m',UUID,PROFILE,NAME,CREATED,STATUS,$'\033[0m' -O 1,NAME
+                   } | column -s '|' -t -N UUID,PROFILE,NAME,CREATED,STATUS -O NAME
                  )"
-            head -n1 <(echo "$TABLE")
-            tail -n+2 <(echo "$TABLE") | sort
+
+            echo -e "\033[4m$(head -n1 <(echo "$TABLE"))\033[0m"
+            CONTENT="$(tail -n+2 <(echo "$TABLE") |sort)"
+            loadedline="$(echo "$CONTENT" | grep -n -e "loaded\$" | cut -d: -f1 |head -n1)"
+            echo "$CONTENT" | head -n$((loadedline-1))
+            echo -e "\033[3m$(echo "$CONTENT" | tail -n+"$loadedline" | head -n1)\033[0m"
+            echo "$CONTENT" | tail -n+$((loadedline+1))
             ;;
         
         #############################################################
