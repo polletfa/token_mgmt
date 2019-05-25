@@ -353,7 +353,7 @@ while [ "$1" != "" ]; do
 		mv /etc/issue.token_mgmt.save /etc/issue
 	    fi
 
-	    find /dev -type b -print | while read -r DEVICE; do
+	    while read -r DEVICE; do
 		echo -en "\033[33mCheck $DEVICE for token: \033[0m"
 		if [ ! -b "$DEVICE" ]; then
 		    echo -e "\033[31mNo device\033[0m"
@@ -435,7 +435,7 @@ while [ "$1" != "" ]; do
 		fi
 		
 		exit 0
-	    done
+	    done < <(find /dev -type b -print)
 
 	    echo -e "\033[31mNo token found!\033[0m"
 	    die
