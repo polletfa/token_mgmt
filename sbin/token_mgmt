@@ -6,7 +6,8 @@ source "$(dirname "$(realpath "$0")")"/../etc/token_mgmt/config
 
 TOKEN_MANAGEMENT="$(dirname "$(realpath "$0")")"/../etc/token_mgmt/
 TOKEN="$TOKEN_MANAGEMENT/.token"
-PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*.tar; do echo -n "$(basename "$i" .tar) "; done )none"
+PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*; do if [ -d "$i" ]; then echo -n "$(basename "$i" .tar) "; fi; done )"
+PROFILES="${PROFILES:0:-1}"
 
 umask 0277
 
@@ -153,10 +154,14 @@ while [ "$1" != "" ]; do
                 echo "create [-p ${PROFILES// /|}] [-P] [-w] [-f] DEVICE"  >&2
             }
 
-            while [ "$2" != "" ]; do
+            while [ "$1" != "" ]; do
                 case "$1" in
                     "-p")
                         profile="$2"; shift; shift
+                        if [ ! -d "$TOKEN_MANAGEMENT/profiles/$profile" ]; then
+                            create_usage
+                            exit 1
+                        fi
                         ;;
                     
                     "-P")
@@ -172,15 +177,33 @@ while [ "$1" != "" ]; do
                         ;;
 
                     *)
-                        create_usage
-                        exit 1
+                        break
                         ;;
                 esac
             done
+            if [ "$1" = "" ] || [ "$2" != "" ]; then
+                create_usage
+                exit 1
+            fi
+            DEVICE="$1"
             
+	    if [ ! -b "$DEVICE" ]; then
+                if [ ! -b "/dev/$DEVICE" ]; then
+		    echo -e "No device." >&2
+                    exit 1
+                else
+                    DEVICE="/dev/$DEVICE"
+                fi
+            fi
+	    if ! dd if="$DEVICE" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
+		echo "Device not available." >&2
+		exit 1
+	    fi
 
 	    #todo
-        ;;
+            
+            exit 0
+            ;;
 
         #############################################################
         # disable
@@ -337,7 +360,7 @@ while [ "$1" != "" ]; do
 		    continue
 		fi
 		if ! dd if="$DEVICE" of=/dev/null skip=512 count=1 status=none 2>/dev/null; then
-		    echo -e "\033[31mNo device\033[0m"
+		    echo -e "\033[31mDevice not available.\033[0m"
 		    continue
 		fi
 		if [ "$(tr -d '\0' < <(dd if="$DEVICE" of=/dev/stdout skip=512 count=1 status=none) | head -c2 )" != $'\x1f\x8b' ]; then
@@ -360,7 +383,11 @@ while [ "$1" != "" ]; do
                 else
                     echo "No profile."
                 fi
-                
+
+                if [ ! -f "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" ]; then
+                    echo -e "\033[31mNot a valid token.\033[0m">&2
+                    die
+                fi
 		function gettokenkey() {
 		    openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" -in key.enc -out /dev/stdout
 		}
