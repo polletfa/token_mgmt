@@ -97,57 +97,6 @@ Commands:
 
     -a   Print all logs
 
-Configuration:
-
-  $TOKEN_MANAGEMENT/config
-
-    General configuration
-
-    DISKS    List of encrypted disks
-
-    MAILTO   User to receive notifications of unauthorized boots.
-
-    BACKUP   Remote directory for rsync backup of the keys
-             <user>@<host>:<path>
-
-    COLUMNS  Dimensions of the login terminal
-    LINES    Used to position the \"Access Denied\" picture in the
-             middle of the screen.
-
-  $TOKEN_MANAGEMENT/picture
-
-    Picture displayed on the login console on unauthorized boots.
-    The picture is written in /etc/issue.
-    Each pixel is represented by a number:
-
-      0  Black
-      1  Red
-      2  Green
-      3  Yellow
-      4  Blue
-      5  Magenta
-      6  Cyan
-      7  White
-
-  $TOKEN_MANAGEMENT/profiles/*
-
-    A profile is a custom configuration that is loaded on top
-    of the system configuration when the token is loaded. A token
-    contains a profile made of multiple overlays.
-
-  $TOKEN_MANAGEMENT/overlays/*
-
-    Overlays are configuration units that can be included in profiles.
-
-Getting started:
-
-  1) Create the first token:     $0 create none
-  2) Load the token:             $0 load -l
-  3) Retrieve the disk keys to
-     encrypt the disks:          <encryption_command> --key-file <( $0 getkey DISK )
-  4) Create additional tokens 
-     for safety.
-
 CAREFUL! IF YOU LOSE ALL ACTIVE TOKENS OR THEIR ASSOCIATED KEYS, 
 THE DISK KEYS ARE LOST FOREVER!
 " 
