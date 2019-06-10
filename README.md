@@ -84,7 +84,7 @@ Print the systemd log for the service (since boot).
 
 ## Configuration
 
-*TOKEN_MANAGEMENT*/config
+**/etc/token_mgmt/config**
 
 General configuration
 
@@ -94,7 +94,7 @@ General configuration
 * COLUMNS - Dimensions of the login terminal
 * LINES - Used to position the "Access Denied" picture in the middle of the screen when the computer starts without valid token.
 
-*TOKEN_MANAGEMENT*/picture
+**/etc/token_mgmt/picture**
 
 Picture displayed on the login console on unauthorized boots. The picture is written in /etc/issue.
 
@@ -108,11 +108,11 @@ Each pixel is represented by a number:
 * 6 - Cyan
 * 7 - White
 
-*TOKEN_MANAGEMENT*/profiles/\*
+**/etc/token_mgmt/profiles/\***
 
 A profile is a custom configuration that is loaded on top of the system configuration when the token is loaded. A token contains a profile made of multiple overlays.
 
-*TOKEN_MANAGEMENT*/overlays/\*
+**/etc/token_mgmt/overlays/\***
 
 Overlays are configuration units that can be included in profiles.
 
@@ -131,6 +131,24 @@ Overlays are configuration units that can be included in profiles.
     ENCRYPTION_COMMAND --key-file <( token_mgmt getkey UDISK )
 
 4) Create additional tokens for safety.
+
+## Tokens
+
+A token is a gzipped tar archive written at offset 512 of a block device. This is intented to put it after the MBR of a partitioned USB flash drive or memory stick. Writting a token on a partition will damage the filesystem.
+
+The tar archive contains the following files:
+* ID - A UUID identifying the token.
+* key.enc - 256 bytes random key encrypted using a 4096 bits RSA key stored on the computer. Used to encrypt other \*.enc files.
+* profile.enc - Additional configuration.
+* \*.enc - 4096 bytes random keys for disk encryption (one for each device specified in the configuration).
+
+## Profiles
+
+A token can include a profile (stored as an encrypted tar archive) which includes one or more overlays (configuration units) and a script executed after the token has been loaded (**post-load.sh**).
+
+The overlays are tar archives inside the overlays/ directory of the profile or one of its subdirectories. When a token is loaded, all overlays in the profile are unpacked in a ramfs filesystem and mounted using overlayfs. The lower directory is specified by the path of the overlay. For example, overlays/etc/systemd/system/getty@tty1.service.d.tar will be mounted over /etc/systemd/system/getty@tty1.service.d.
+
+/etc/token_mgmt/overlays/ and /etc/token_mgmt/profiles/ contain the templates for the overlays and profiles. To create a new overlay, simply create a new directory containing any file you wish (for example: */etc/token_mgmt/overlays/my-overlay/*). The archive will be created on the fly when creating a new token. To include this overlay in a profile, create a dead symbolic link to the (not yet existing) archive (for example: */etc/token_mgmt/overlays/my-overlay.tar*).
 
 ## Warning
 
