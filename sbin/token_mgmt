@@ -40,7 +40,6 @@ function getdiskkey() {
     openssl enc -d -aes-256-cbc -iter 10 -in "$TOKEN/$1.enc" -out /dev/stdout -pass file:<(gettokenkey)
 }
 
-# todo: reduce text and create man page instead
 function usage() {
     echo "$0 command parameters
 
