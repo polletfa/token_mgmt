@@ -254,7 +254,7 @@ while [ "$1" != "" ]; do
 
             if [ -n "$partition" ]; then
                 echo "Create new partition table..."
-                echo ";,7" | sudo sfdisk  /dev/mmcblk0 || die
+                echo ";,7" | sudo sfdisk  "$device" || die
                 mkfs.ntfs "$(ls "$device"?* | sort | head -n1)" || die
             fi
             
