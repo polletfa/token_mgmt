@@ -462,7 +462,7 @@ while [ "$1" != "" ]; do
 		cd "$TOKEN" || die
 
 		echo "Extract token..."
-		tar zxvf <(dd if="$device" of=/dev/stdout skip=512) || die
+		tar zxvf <(dd if="$device" of=/dev/stdout skip=512 count=100) || die
 		echo "ID: $(cat "ID")"
 
                 if [ ! -f "$TOKEN_MANAGEMENT/keys/$(cat ID).pem" ]; then
