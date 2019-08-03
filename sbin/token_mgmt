@@ -385,32 +385,6 @@ while [ "$1" != "" ]; do
 		exit 1
 	    fi
 
-	    function issue() {
-		SIGN="$(cat "$TOKEN_MANAGEMENT"/picture)"
-
-		HEIGHT="$(echo "$SIGN" | wc -l)"
-		WIDTH="$(( 2 * ( $(echo "$SIGN" | head -n1 | wc -c ) - 1 ) ))"
-		X="$(( ( COLUMNS - WIDTH ) / 2 ))"
-		Y="$(( ( LINES - HEIGHT ) / 2 ))"
-
-		echo -e -n "\033[2J\033[$Y;${X}H\033[40m"
-		
-		prev=
-		for (( i=0; i<${#SIGN}; i++ )); do
-		    if [[ "${SIGN:$i:1}" == $'\n' ]]; then
-			echo
-			echo -e -n "\033[${X}G"
-		    else
-			if [ "${SIGN:$i:1}" != "$prev" ]; then
-			    echo -n -e "\033[4${SIGN:$i:1}m"
-			    prev="${SIGN:$i:1}"
-			fi
-			echo -n "  "
-		    fi
-		done
-		echo -e "\033[H\033[40;37mUnauthorized access!"
-	    }
-
 	    function unmount() {
 		cd / || exit 1
 		umount "$(mount|grep "$TOKEN"|cut -f3 -d\  )" 2>/dev/null
@@ -420,13 +394,11 @@ while [ "$1" != "" ]; do
 	    function die() {
 		echo "Failed!" >&2
 
-		if [ -f /etc/issue ]; then
-		    cp /etc/issue /etc/issue.token_mgmt.save
-		else
-		    echo > /etc/issue.token_mgmt.save
-		fi
-		issue > /etc/issue
-		
+                if [ -n "$PICTURE" ]; then
+                    echo -e "\033[2J">/dev/console
+		    echo|fbv -c -i -a "$PICTURE_PARAMS" "$TOKEN_MANAGEMENT"/"$PICTURE"
+                fi
+                
 		if [ "$MAILTO" != "" ]; then
 		    journalctl -u token_mgmt --boot | mail -s "[token_mgmt] Unauthorized access!" "$MAILTO"
 		fi
@@ -434,10 +406,6 @@ while [ "$1" != "" ]; do
 		unmount
 		exit 1
 	    }
-
-	    if [ -f /etc/issue.token_mgmt.save ]; then
-		mv /etc/issue.token_mgmt.save /etc/issue
-	    fi
 
 	    while read -r device; do
 		echo -n "Check $device for token: "

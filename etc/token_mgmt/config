@@ -15,10 +15,20 @@ DISKS="sda1"
 #BACKUP="user@host:path"
 
 #
-# Dimensions of the login terminal
-# Used to position the "Access Denied" picture in the
-# middle of the screen.
+# Picture to display in case of unauthorized access.
+# The path is relative to the token_mgmt configuration directory.
 #
-COLUMNS="240"
-LINES="67"
+PICTURE="Z267.png"
 
+#
+# Display parameters for the picture:
+#
+#  --stretch      | -f: Strech (using a simple resizing routine)
+#                       the image to fit onto screen if necessary
+#  --colorstretch | -k: Strech (using a 'color average' resizing routine)
+#                       the image to fit onto screen if necessary
+#  --enlarge      | -e: Enlarge the image to fit the whole screen if
+#                       necessary
+#  --ignore-aspect| -r: Ignore the image aspect while resizing
+#
+PICTURE_PARAMS=""

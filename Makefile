@@ -11,7 +11,8 @@ install: token_mgmt.8.gz
 	install -D -d -m 0755 "${PREFIX}"/etc/token_mgmt/profiles/guest/overlays/lib/systemd/system
 	rm -f "${PREFIX}"/etc/token_mgmt/profiles/guest/overlays/etc/systemd/system/getty@tty1.service.d.tar
 	ln -s "${PREFIX}"/etc/token_mgmt/overlays/guest-autologin.tar "${PREFIX}"/etc/token_mgmt/profiles/guest/overlays/etc/systemd/system/getty@tty1.service.d.tar
-	install -D -C -b --suffix .previous -m 0600 -t "${PREFIX}/etc/token_mgmt" etc/token_mgmt/picture etc/token_mgmt/config
+	install -D -m 0644 -t "${PREFIX}"/etc/token_mgmt/ etc/token_mgmt/Z267.png
+	install -D -C -b --suffix .previous -m 0600 -t "${PREFIX}/etc/token_mgmt" etc/token_mgmt/config
 	install -D -C -b --suffix .previous -m 0644 -t /lib/systemd/system/ token_mgmt.service
 	systemctl enable token_mgmt
 

@@ -114,32 +114,8 @@ List of encrypted disks
 User to receive notifications of unauthorized boots.
 .IP BACKUP
 Remote directory for rsync backup of the keys in the format \fIUSER\fR@\fIHOST\fR:\fIPATH\fR
-.IP COLUMNS
-Dimensions of the login terminal
-.IP LINES
-Used to position the "Access Denied" picture in the middle of the screen when the computer starts without valid token.
-.PP
-.B /etc/token_mgmt/picture
-.PP
-Picture displayed on the login console on unauthorized boots. The picture is written in /etc/issue.
-.PP
-Each pixel is represented by a number:
-.IP 0
-Black
-.IP 1
-Red
-.IP 2
-Green
-.IP 3
-Yellow
-.IP 4
-Blue
-.IP 5
-Magenta
-.IP 6
-Cyan
-.IP 7
-White
+.IP PICTURE
+Picture to be displayed in case of unauthorized access. The path is relative to the configuration directory.
 .PP
 .B /etc/token_mgmt/profiles/*
 .PP

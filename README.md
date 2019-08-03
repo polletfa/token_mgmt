@@ -91,22 +91,8 @@ General configuration
 * DISKS - List of encrypted disks
 * MAILTO - User to receive notifications of unauthorized boots.
 * BACKUP - Remote directory for rsync backup of the keys in the format *USER*@*HOST*:*PATH*
-* COLUMNS - Dimensions of the login terminal
-* LINES - Used to position the "Access Denied" picture in the middle of the screen when the computer starts without valid token.
-
-**/etc/token_mgmt/picture**
-
-Picture displayed on the login console on unauthorized boots. The picture is written in /etc/issue.
-
-Each pixel is represented by a number:
-* 0 - Black
-* 1 - Red
-* 2 - Green
-* 3 - Yellow
-* 4 - Blue
-* 5 - Magenta
-* 6 - Cyan
-* 7 - White
+* PICTURE - Picture to be displayed in case of unauthorized access. The path is relative
+            to the configuration directory.
 
 **/etc/token_mgmt/profiles/\***
 

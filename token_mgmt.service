@@ -1,7 +1,7 @@
 #
 # Note: if you have ZFS pools on encrypted devices,
 # you should disable zfs-import-cache and delete the
-# zpool cache (/etc/zfs/zpool.cache.
+# zpool cache (/etc/zfs/zpool.cache).
 # Otherwise, these devices would be removed from the cache
 # after a failed attempt to load a token and would need to
 # be reimported manually on the next boot.
@@ -9,7 +9,7 @@
 #
 
 [Unit]
-Description=Load token and decrypt disks
+Description=Decrypt disks
 DefaultDependencies=no
 
 Requires=systemd-udev-settle.service
@@ -20,6 +20,9 @@ After=cryptsetup.target
 After=systemd-remount-fs.service
 
 Before=zfs-import-scan.service
+
+OnFailure=emergency.target
+OnFailureJobMode=replace-irreversibly
 
 [Service]
 Type=oneshot
