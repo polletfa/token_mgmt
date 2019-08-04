@@ -238,12 +238,12 @@ while [ "$1" != "" ]; do
                 done < <(find "$TOKEN_MANAGEMENT/profiles/$profile/overlays" -name "*.tar")
                 echo "Pack profile $profile..."
                 tar chf "$TOKEN_MANAGEMENT/profiles/$profile.tar" -C "$TOKEN_MANAGEMENT/profiles/$profile" . || exit 1
+            
+                echo "Encrypt profile..."
+                openssl enc -aes-256-cbc -iter 10 -in "$TOKEN_MANAGEMENT/profiles/$profile.tar" -out "$TMP/profile.enc" \
+                        -pass file:<(echo -n "$KEY") || die
             fi
-
-            echo "Encrypt profile..."
-            openssl enc -aes-256-cbc -iter 10 -in "$TOKEN_MANAGEMENT/profiles/$profile.tar" -out "$TMP/profile.enc" \
-                    -pass file:<(echo -n "$KEY") || die
-
+            
             echo "Prepare token..."
             tar zchf "$TMP/$UUID".tar.gz -C "$TMP" --exclude="*.tar.gz" . || die
 
