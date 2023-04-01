@@ -34,7 +34,7 @@ function update_backup() {
 }
 
 function gettokenkey() {
-    openssl rsautl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat "$TOKEN/ID").pem" -in "$TOKEN/key.enc" -out /dev/stdout
+    openssl pkeyutl -decrypt -inkey "$TOKEN_MANAGEMENT/keys/$(cat "$TOKEN/ID").pem" -in "$TOKEN/key.enc" -out /dev/stdout
 }
 function getdiskkey() {
     openssl enc -d -aes-256-cbc -iter 10 -in "$TOKEN/$1.enc" -out /dev/stdout -pass file:<(gettokenkey)
@@ -204,18 +204,18 @@ while [ "$1" != "" ]; do
                 exit 1
             }
             
-            mkdir "$TMP"
+            mkdir -p "$TMP"/token
             UUID="$(uuidgen)"
-            echo "$UUID" > "$TMP"/ID
+            echo "$UUID" > "$TMP"/token/ID
 
             echo "Create token private key..."
             PRIVATE_KEY="$(openssl genrsa -out /dev/stdout 4096 )" || die
 
             echo "Create token encryption key..."
             KEY="$(openssl rand -base64 256 )"
-            openssl rsautl -encrypt \
+            openssl pkeyutl -encrypt \
                     -inkey <(openssl rsa -pubout -in <(echo -n "$PRIVATE_KEY") -out /dev/stdout || die ) \
-                    -pubin -in <(echo -n "$KEY") -out "$TMP/key.enc" || die
+                    -pubin -in <(echo -n "$KEY") -out "$TMP/token/key.enc" || die
 
             for i in $DISKS; do
                 if [ "$createkeys" == "y" ]; then
@@ -226,7 +226,7 @@ while [ "$1" != "" ]; do
                     DISKKEY="$(getdiskkey "$i" | base64)" || die
                 fi
                 echo "Encrypt the key for disk $i..."
-                openssl enc -aes-256-cbc -iter 10 -in <(echo -n "$DISKKEY" | base64 -d) -out "$TMP/$i.enc" \
+                openssl enc -aes-256-cbc -iter 10 -in <(echo -n "$DISKKEY" | base64 -d) -out "$TMP/token/$i.enc" \
                         -pass file:<(echo -n "$KEY" ) || die
             done
                         
@@ -240,12 +240,12 @@ while [ "$1" != "" ]; do
                 tar chf "$TOKEN_MANAGEMENT/profiles/$profile.tar" -C "$TOKEN_MANAGEMENT/profiles/$profile" . || exit 1
             
                 echo "Encrypt profile..."
-                openssl enc -aes-256-cbc -iter 10 -in "$TOKEN_MANAGEMENT/profiles/$profile.tar" -out "$TMP/profile.enc" \
+                openssl enc -aes-256-cbc -iter 10 -in "$TOKEN_MANAGEMENT/profiles/$profile.tar" -out "$TMP/token/profile.enc" \
                         -pass file:<(echo -n "$KEY") || die
             fi
             
             echo "Prepare token..."
-            tar zchf "$TMP/$UUID".tar.gz -C "$TMP" --exclude="*.tar.gz" . || die
+            tar zchf "$TMP/$UUID".tar.gz -C "$TMP/token" . || die
 
             if [ -n "$wipe" ]; then
                 echo "Wipe device..."
