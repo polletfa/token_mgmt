@@ -14,7 +14,7 @@ source "$configdir"/token_mgmt/config
 TOKEN_MANAGEMENT="$configdir"/token_mgmt/
 TOKEN="$TOKEN_MANAGEMENT/.token"
 PROFILES="$(for i in "$TOKEN_MANAGEMENT"/profiles/*; do if [ -d "$i" ]; then echo -n "$(basename "$i" .tar) "; fi; done )"
-PROFILES="${PROFILES:0:-1}"
+if [ -n "$PROFILES" ]; then PROFILES="${PROFILES:0:-1}"; fi
 
 umask 0277
 

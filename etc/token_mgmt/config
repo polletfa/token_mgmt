@@ -18,7 +18,7 @@ DISKS="sda1"
 # Picture to display in case of unauthorized access.
 # The path is relative to the token_mgmt configuration directory.
 #
-PICTURE="Z267.png"
+PICTURE="Z267.jpg"
 
 #
 # Display parameters for the picture:
